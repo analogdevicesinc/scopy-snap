@@ -1,0 +1,129 @@
+name: scopy
+version: "0.3"
+summary: Scopy
+description: Signal / Logic Generator and Analyzer
+grade: devel
+
+apps:
+    scopy:
+        command: qt5-launch scopy
+        desktop: share/applications/scopy.desktop
+        plugs:
+            - home
+            - x11
+            - opengl
+            - network
+            - avahi-observe
+            - iio
+            - raw-usb
+
+parts:
+    libiio:
+        source: https://github.com/analogdevicesinc/libiio.git
+        source-type: git
+        plugin: cmake
+        configflags:
+            - -DINSTALL_UDEV_RULE:BOOL=OFF
+            - -DWITH_TESTS:BOOL=OFF
+            - -DWITH_DOC:BOOL=OFF
+            - -DWITH_IIOD:BOOL=OFF
+            - -DWITH_MATLAB_BINDINGS_API:BOOL=OFF
+        build-packages:
+            - libxml2-dev
+            - libusb-1.0-0-dev
+            - libavahi-client-dev
+
+    sigrok:
+        source: https://github.com/sschnelle/libsigrok.git
+        source-type: git
+        plugin: autotools
+        configflags:
+            - --disable-all-drivers
+            - --enable-bindings
+            - --enable-cxx
+        build-packages:
+            - libglib2.0-dev
+            - libglibmm-2.4-dev
+            - libsigc++-2.0-dev
+
+    sigrokdecode:
+        source: http://sigrok.org/download/source/libsigrokdecode/libsigrokdecode-0.4.1.tar.gz
+        plugin: autotools
+        after:
+            - sigrok
+
+    qwt:
+        source: https://github.com/osakared/qwt.git
+        source-type: git
+        source-branch: qwt-6.1-multiaxes
+        plugin: qmake
+        qt-version: qt5
+        prepare: |
+            sed -i "s/^\\s*QWT_INSTALL_PREFIX.*$/QWT_INSTALL_PREFIX=\"\"/g" qwtconfig.pri
+            sed -i "s/^QWT_CONFIG\\s*+=\\s*QwtMathML$/#/g" qwtconfig.pri
+            sed -i "s/^QWT_CONFIG\\s*+=\\s*QwtDesigner$/#/g" qwtconfig.pri
+            sed -i "s/^QWT_CONFIG\\s*+=\\s*QwtExamples$/#/g" qwtconfig.pri
+
+    qwtpolar:
+        source: https://downloads.sourceforge.net/project/qwtpolar/qwtpolar/1.1.1/qwtpolar-1.1.1.tar.bz2
+        plugin: qmake
+        qt-version: qt5
+        prepare: |
+            patch -p1 < ../../../qwtpolar-qwt-6.1-compat.patch
+            sed -i "s/^\\s*QWT_POLAR_INSTALL_PREFIX.*$/QWT_POLAR_INSTALL_PREFIX=\"\"/g" qwtpolarconfig.pri
+            sed -i "s/^QWT_POLAR_CONFIG\\s*+=\\s*QwtPolarDesigner$/#/g" qwtpolarconfig.pri
+            sed -i "s/^QWT_POLAR_CONFIG\\s*+=\\s*QwtPolarExamples$/#/g" qwtpolarconfig.pri
+        after:
+            - qwt
+
+    gnuradio:
+        source: https://github.com/gnuradio/gnuradio.git
+        source-type: git
+        plugin: cmake
+        configflags:
+            - -DENABLE_DEFAULT=OFF
+            - -DENABLE_GNURADIO_RUNTIME:BOOL=ON
+            - -DENABLE_GR_ANALOG:BOOL=ON
+            - -DENABLE_GR_BLOCKS:BOOL=ON
+            - -DENABLE_GR_FFT:BOOL=ON
+            - -DENABLE_GR_FILTER:BOOL=ON
+            - -DENABLE_INTERNAL_VOLK:BOOL=OFF
+            - -DENABLE_PYTHON:BOOL=ON
+        build-packages:
+            - libvolk1-dev
+            - libfftw3-dev
+            - libboost-date-time-dev
+            - libboost-filesystem-dev
+            - libboost-program-options-dev
+            - libboost-regex-dev
+            - libboost-system-dev
+            - libboost-test-dev
+            - libboost-thread-dev
+            - python2.7
+
+    gr-iio:
+        source: https://github.com/analogdevicesinc/gr-iio.git
+        source-type: git
+        plugin: cmake
+        build-packages:
+            - bison
+            - flex
+        after:
+            - gnuradio
+            - libiio
+
+    scopy:
+        source: https://github.com/analogdevicesinc/scopy.git
+        plugin: cmake
+        stage-packages:
+            - libqt5gui5
+            - libqt5svg5
+        after:
+            - libiio
+            - gnuradio
+            - gr-iio
+            - qwt
+            - qwtpolar
+            - sigrok
+            - sigrokdecode
+            - qt5conf
